@@ -93,9 +93,15 @@ class ContentfulFDW(ForeignDataWrapper):
 
                 row['content_type'] = result.sys['content_type'].id
 
-                for columnName in result.fields().keys():
-                    row[columnName] = result.fields()[columnName]
-    
+                fields = result.fields()
+                for columnName in fields.keys():
+                    if type(fields[columnName]) is contentful.Asset:
+                        row[columnName] = fields[columnName].id
+                    elif type(fields[columnName]) is contentful.Entry:
+                        row[columnName] = fields[columnName].id
+                    else:
+                        row[columnName] = fields[columnName]
+
                 yield row
         elif self.type == 'Asset':
             results = client.assets(query)
