@@ -14,10 +14,17 @@ create server mycontentfulspace foreign data wrapper multicorn options (
 	space 'cfexampleapi',
 	api_key 'b4c0n73n7fu1'
 );
-create foreign table mytable (
+create foreign table content_types (
     id varchar,
     type varchar,
     name varchar
- ) server mycontentfulspace options (table_name 'ignore');
-SELECT * FROM mytable;
+ ) server mycontentfulspace options (table_name 'content_types');
+
+ create foreign table cat_entries (
+    id varchar,
+    type varchar
+ ) server mycontentfulspace options (table_name 'cat');
+
+SELECT * FROM content_types;
+SELECT * FROM cat_entries;
 ```

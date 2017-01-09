@@ -34,6 +34,11 @@ class ContentfulFDW(ForeignDataWrapper):
         else:
             log_to_postgres('api_key parameter is required.', ERROR)
 
+        if options.has_key('table_name'):
+            self.table_name = options['table_name']
+        else:
+            log_to_postgres('table_name parameter is required.', ERROR)
+
         self.columns = columns
 
 
@@ -50,17 +55,32 @@ class ContentfulFDW(ForeignDataWrapper):
         # What we really want is this:  "{key:value}"
         # so we serialize it here.  (This is git issue #1 for this repo, and issue #86 in the Multicorn repo.)
 
-        for resultRow in client.content_types():
+        if self.table_name == 'content_types':
+            query = client.content_types()
+            for resultRow in query:
 
-            # I don't think we can mutate the row in the rethinkResults cursor directly.
-            # It needs to be copied out of the cursor to be reliably mutable.
-            row = OrderedDict()
+                # I don't think we can mutate the row in the rethinkResults cursor directly.
+                # It needs to be copied out of the cursor to be reliably mutable.
+                row = OrderedDict()
 
-            row['id'] = resultRow.id
-            row['name'] = resultRow.name
-            row['type'] = resultRow.type
+                row['id'] = resultRow.id
+                row['name'] = resultRow.name
+                row['type'] = resultRow.type
 
-            yield row
+                yield row
+        else:
+            query = client.entries({'content_type': self.table_name})
+
+            for resultRow in query:
+
+                # I don't think we can mutate the row in the rethinkResults cursor directly.
+                # It needs to be copied out of the cursor to be reliably mutable.
+                row = OrderedDict()
+
+                row['id'] = resultRow.id
+                row['type'] = resultRow.type
+
+                yield row
 
 
     # # SQL INSERT:
