@@ -19,7 +19,7 @@ def getOperatorFunction(opr):
       '!=':         '[ne]'
   }
 
-  if not operatorFunctionMap.has_key(opr):
+  if opr not in operatorFunctionMap:
       raise unknownOperatorException("'%s' is not a supported operator." % opr)
 
   return operatorFunctionMap[opr]

@@ -1,3 +1,2 @@
-# Deis CLI requirements
-
 contentful==1.0.2
+requests==2.12.1
