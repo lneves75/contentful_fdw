@@ -17,14 +17,27 @@ create server mycontentfulspace foreign data wrapper multicorn options (
 create foreign table content_types (
     id varchar,
     type varchar,
-    name varchar
- ) server mycontentfulspace options (table_name 'content_types');
+    name varchar,
+    description varchar,
+    display_field varchar,
+    fields jsonb
+ ) server mycontentfulspace options (type 'ContentType');
 
  create foreign table cat_entries (
     id varchar,
     type varchar
- ) server mycontentfulspace options (table_name 'cat');
+ ) server mycontentfulspace options (type 'Entry', content_type 'cat');
+
+  create foreign table assets (
+    id varchar,
+    type varchar,
+    title varchar,
+    description varchar,
+    file_name varchar,
+    file_content_type varchar,
+    file_url varchar,
+    file_size numeric
+ ) server mycontentfulspace options (type 'Asset');
 
 SELECT * FROM content_types;
-SELECT * FROM cat_entries;
 ```

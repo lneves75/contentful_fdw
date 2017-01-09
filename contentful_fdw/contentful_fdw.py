@@ -34,10 +34,15 @@ class ContentfulFDW(ForeignDataWrapper):
         else:
             log_to_postgres('api_key parameter is required.', ERROR)
 
-        if options.has_key('table_name'):
-            self.table_name = options['table_name']
+        if options.has_key('type'):
+            self.type = options['type']
         else:
-            log_to_postgres('table_name parameter is required.', ERROR)
+            log_to_postgres('type parameter is required.', ERROR)
+
+        if options.has_key('content_type'):
+            self.content_type = options['content_type']
+        elif self.type == 'Entry':
+            log_to_postgres('content_type parameter is required when using entries.', ERROR)
 
         self.columns = columns
 
@@ -55,32 +60,71 @@ class ContentfulFDW(ForeignDataWrapper):
         # What we really want is this:  "{key:value}"
         # so we serialize it here.  (This is git issue #1 for this repo, and issue #86 in the Multicorn repo.)
 
-        if self.table_name == 'content_types':
+        if self.type == 'ContentType':
             query = client.content_types()
-            for resultRow in query:
+            for result in query:
+                row = OrderedDict()
+                sysMap = {
+                    'id': 'id',
+                    'type': 'type'
+                }
 
-                # I don't think we can mutate the row in the rethinkResults cursor directly.
-                # It needs to be copied out of the cursor to be reliably mutable.
+                for key, value in sysMap.iteritems():
+                    row[key] = deepgetitem(result.sys, value)
+
+                row['name'] = result.name
+                row['description'] = result.description
+                row['display_field'] = result.display_field
+                row['fields'] = json.dumps(list(map(lambda x: x.raw, result.fields))) # TODO: Can we do better?
+
+                yield row
+        elif self.type == 'Entry':
+            query = client.entries({'content_type': self.content_type})
+
+            for result in query:
+                row = OrderedDict()
+                sysMap = {
+                    'id': 'id',
+                    'type': 'type',
+                    'content_type': 'contentType.sys.id'
+                }
+
+                for key, value in sysMap.iteritems():
+                    row[key] = deepgetitem(result.sys, value)
+
+                yield row
+        elif self.type == 'Asset':
+            query = client.assets()
+
+            for result in query:
                 row = OrderedDict()
 
-                row['id'] = resultRow.id
-                row['name'] = resultRow.name
-                row['type'] = resultRow.type
+                sysMap = {
+                    'id': 'id',
+                    'type': 'type'
+                }
+
+                fieldsMap = {
+                    'title': 'title',
+                    'description': 'description',
+                    'file_name': 'file.fileName',
+                    'file_content_type': 'file.contentType',
+                    'file_url': 'file.url',
+                    'file_size': 'file.details.size',
+                }
+
+                for key, value in sysMap.iteritems():
+                    log_to_postgres('Getting sys %s => %s.' % (key, value), DEBUG)
+                    row[key] = deepgetitem(result.sys, value)
+
+                fields = result.fields()
+                for key, value in fieldsMap.iteritems():
+                    log_to_postgres('Getting fields %s => %s.' % (key, value), DEBUG)
+                    row[key] = deepgetitem(fields, value)
 
                 yield row
         else:
-            query = client.entries({'content_type': self.table_name})
-
-            for resultRow in query:
-
-                # I don't think we can mutate the row in the rethinkResults cursor directly.
-                # It needs to be copied out of the cursor to be reliably mutable.
-                row = OrderedDict()
-
-                row['id'] = resultRow.id
-                row['type'] = resultRow.type
-
-                yield row
+            log_to_postgres('Querying %s is not supported yet.' % self.type, ERROR)
 
 
     # # SQL INSERT:
@@ -123,3 +167,22 @@ class ContentfulFDW(ForeignDataWrapper):
         log_to_postgres('rowid requested', DEBUG)
 
         return 'id'
+
+def deepgetitem(obj, item, fallback=None):
+    """Steps through an item chain to get the ultimate value.
+
+    If ultimate value or path to value does not exist, does not raise
+    an exception and instead returns `fallback`.
+
+    >>> d = {'snl_final': {'about': {'_icsd': {'icsd_id': 1}}}}
+    >>> deepgetitem(d, 'snl_final.about._icsd.icsd_id')
+    1
+    >>> deepgetitem(d, 'snl_final.about._sandbox.sbx_id')
+    >>>
+    """
+    def getitem(obj, name):
+        try:
+            return obj[name]
+        except (KeyError, TypeError):
+            return None
+    return reduce(getitem, item.split('.'), obj)
