@@ -25,7 +25,8 @@ create foreign table content_types (
 
  create foreign table cat_entries (
     id varchar,
-    type varchar
+    type varchar,
+    content_type varchar
  ) server mycontentfulspace options (type 'Entry', content_type 'cat');
 
   create foreign table assets (
@@ -40,4 +41,6 @@ create foreign table content_types (
  ) server mycontentfulspace options (type 'Asset');
 
 SELECT * FROM content_types;
+
+SELECT * FROM cat_entries WHERE id != 'nyancat';
 ```

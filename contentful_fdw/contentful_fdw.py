@@ -7,6 +7,8 @@ import json
 from multicorn import ForeignDataWrapper
 from multicorn.utils import log_to_postgres, ERROR, WARNING, DEBUG
 
+from operator_map import unknownOperatorException, getOperatorFunction
+
 import contentful
 
 
@@ -51,18 +53,25 @@ class ContentfulFDW(ForeignDataWrapper):
     def execute(self, quals, columns):
 
         log_to_postgres('Query Columns:  %s' % columns, DEBUG)
-        log_to_postgres('Query Filters:  %s' % quals, DEBUG)
 
         client = contentful.Client(self.space, self.api_key)
 
-        # By default, Multicorn seralizes dictionary types into something for hstore column types.
-        # That looks something like this:   "key => value"
-        # What we really want is this:  "{key:value}"
-        # so we serialize it here.  (This is git issue #1 for this repo, and issue #86 in the Multicorn repo.)
+        log_to_postgres('Query Filters:  %s' % quals, DEBUG)
+        query = {}
+
+        for qual in quals:
+            try:
+                operator = getOperatorFunction(qual.operator)
+            except unknownOperatorException, e:
+                log_to_postgres(e, ERROR)
+
+            query[translateQueryField(qual.field_name) + operator] = qual.value
+
+        log_to_postgres('Translated query: %s' % (json.dumps(query)), DEBUG)
 
         if self.type == 'ContentType':
-            query = client.content_types()
-            for result in query:
+            results = client.content_types(query)
+            for result in results:
                 row = OrderedDict()
 
                 parseSys(row, result)
@@ -74,9 +83,10 @@ class ContentfulFDW(ForeignDataWrapper):
 
                 yield row
         elif self.type == 'Entry':
-            query = client.entries({'content_type': self.content_type})
+            query['content_type'] = self.content_type
+            results = client.entries(query)
 
-            for result in query:
+            for result in results:
                 row = OrderedDict()
 
                 parseSys(row, result)
@@ -88,9 +98,9 @@ class ContentfulFDW(ForeignDataWrapper):
     
                 yield row
         elif self.type == 'Asset':
-            query = client.assets()
+            results = client.assets(query)
 
-            for result in query:
+            for result in results:
                 row = OrderedDict()
 
                 parseSys(row, result)
@@ -184,3 +194,14 @@ def parseSys(row, result):
     for key, value in sysMap.iteritems():
         log_to_postgres('Mapping `sys.%s` to `%s`' % (value, key), DEBUG)
         row[key] = deepgetitem(result.sys, value)
+
+def translateQueryField(field):
+    sysFields = {
+        'id' : 'sys.id',
+        'type': 'sys.type'
+    }
+
+    if sysFields.has_key(field):
+        return sysFields[field]
+
+    return 'fields.%s' % field
