@@ -64,13 +64,8 @@ class ContentfulFDW(ForeignDataWrapper):
             query = client.content_types()
             for result in query:
                 row = OrderedDict()
-                sysMap = {
-                    'id': 'id',
-                    'type': 'type'
-                }
 
-                for key, value in sysMap.iteritems():
-                    row[key] = deepgetitem(result.sys, value)
+                parseSys(row, result)
 
                 row['name'] = result.name
                 row['description'] = result.description
@@ -83,14 +78,10 @@ class ContentfulFDW(ForeignDataWrapper):
 
             for result in query:
                 row = OrderedDict()
-                sysMap = {
-                    'id': 'id',
-                    'type': 'type',
-                    'content_type': 'contentType.sys.id'
-                }
 
-                for key, value in sysMap.iteritems():
-                    row[key] = deepgetitem(result.sys, value)
+                parseSys(row, result)
+
+                row['content_type'] = result.sys['content_type'].id
 
                 yield row
         elif self.type == 'Asset':
@@ -99,10 +90,7 @@ class ContentfulFDW(ForeignDataWrapper):
             for result in query:
                 row = OrderedDict()
 
-                sysMap = {
-                    'id': 'id',
-                    'type': 'type'
-                }
+                parseSys(row, result)
 
                 fieldsMap = {
                     'title': 'title',
@@ -113,9 +101,6 @@ class ContentfulFDW(ForeignDataWrapper):
                     'file_size': 'file.details.size',
                 }
 
-                for key, value in sysMap.iteritems():
-                    log_to_postgres('Getting sys %s => %s.' % (key, value), DEBUG)
-                    row[key] = deepgetitem(result.sys, value)
 
                 fields = result.fields()
                 for key, value in fieldsMap.iteritems():
@@ -186,3 +171,13 @@ def deepgetitem(obj, item, fallback=None):
         except (KeyError, TypeError):
             return None
     return reduce(getitem, item.split('.'), obj)
+
+def parseSys(row, result):
+    sysMap = {
+        'id': 'id',
+        'type': 'type'
+    }
+
+    for key, value in sysMap.iteritems():
+        log_to_postgres('Mapping `sys.%s` to `%s`' % (value, key), DEBUG)
+        row[key] = deepgetitem(result.sys, value)
