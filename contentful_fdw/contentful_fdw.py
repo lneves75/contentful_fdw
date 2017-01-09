@@ -24,32 +24,15 @@ class ContentfulFDW(ForeignDataWrapper):
         log_to_postgres('options:  %s' % options, DEBUG)
         log_to_postgres('columns:  %s' % columns, DEBUG)
 
-        # if options.has_key('host'):
-        #     self.host = options['host']
-        # else:
-        #     self.host = 'localhost'
-        #     log_to_postgres('Using Default host:  localhost.', WARNING)
-        #
-        # if options.has_key('port'):
-        #     self.port = options['port']
-        # else:
-        #     self.port = '28015'
-        #     log_to_postgres('Using Default port: 28015.', WARNING)
-        #
-        # if options.has_key('database'):
-        #     self.database = options['database']
-        # else:
-        #     log_to_postgres('database parameter is required.', ERROR)
-        #
-        # if options.has_key('table_name'):
-        #     self.table = options['table_name']
-        # else:
-        #     log_to_postgres('table_name parameter is required.', ERROR)
+        if options.has_key('space'):
+            self.space = options['space']
+        else:
+            log_to_postgres('space parameter is required.', ERROR)
 
-        # if options.has_key('auth_key'):
-        #     self.auth_key = options['auth_key']
-        # else:
-        #     log_to_postgres('auth_key parameter is required.', ERROR)
+        if options.has_key('api_key'):
+            self.api_key = options['api_key']
+        else:
+            log_to_postgres('api_key parameter is required.', ERROR)
 
         self.columns = columns
 
@@ -60,7 +43,7 @@ class ContentfulFDW(ForeignDataWrapper):
         log_to_postgres('Query Columns:  %s' % columns, DEBUG)
         log_to_postgres('Query Filters:  %s' % quals, DEBUG)
 
-        client = contentful.Client('cfexampleapi', 'b4c0n73n7fu1')
+        client = contentful.Client(self.space, self.api_key)
 
         # By default, Multicorn seralizes dictionary types into something for hstore column types.
         # That looks something like this:   "key => value"
