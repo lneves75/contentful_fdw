@@ -83,6 +83,9 @@ class ContentfulFDW(ForeignDataWrapper):
 
                 row['content_type'] = result.sys['content_type'].id
 
+                for columnName in result.fields().keys():
+                    row[columnName] = result.fields()[columnName]
+    
                 yield row
         elif self.type == 'Asset':
             query = client.assets()
